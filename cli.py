@@ -1,20 +1,28 @@
 import asyncio
+import fcntl
+import os
 import sys
 from aioconsole import get_standard_streams
 
 import config
-from node import Node
+from node.node import Node
 from transporter import Transporter
 
 
 async def main():
+    fl = fcntl.fcntl(sys.stdout, fcntl.F_GETFL)
+    fcntl.fcntl(sys.stdout, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+    fl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
+    fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+    reader, writer = await get_standard_streams()
+
     number = int(sys.argv[1])
-    host, port = config.nodes[number]
-    transporter = Transporter(host, port)
-    node = Node(number, transporter)
+    host, port = config.NODES[number]
+    transporter = Transporter(host, port, writer)
+    node = Node(number, transporter, writer)
 
     async def read_cli():
-        reader, writer = await get_standard_streams()
         while True:
             res = await reader.readline()
             writer.write(b"Repeat: ")
