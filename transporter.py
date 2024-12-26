@@ -1,21 +1,32 @@
 import asyncio
 import datetime
 import pickle
+import random
 from asyncio import StreamWriter
+from pickle import PickleError
 from typing import Callable, Awaitable
 
 import config
+import messages
 from messages import MessageRequest, MessageResponse
 
 
 class Transporter:
     handler: Callable[[MessageRequest], Awaitable[MessageResponse]] | None = None
+    node_latency: dict[int, float]
+    block_in: dict[int, bool]
+    block_out: dict[int, bool]
 
     def __init__(self, host, port, stdout: StreamWriter):
         self.stdout = stdout
         self.host = host
         self.port = port
-        self.ignore_nodes = {i: False for i in config.NODES}
+        self.reset()
+
+    def reset(self):
+        self.node_latency = {i: config.DEFAULT_DELAY for i in config.NODES}
+        self.block_in = {i: False for i in config.NODES}
+        self.block_out = {i: False for i in config.NODES}
 
     async def print(self, string: str):
         self.stdout.write(string.encode())
@@ -30,12 +41,16 @@ class Transporter:
 
     # noinspection PyMethodMayBeStatic
     async def send_request(self, node_id: int, message: MessageRequest) -> MessageResponse | None:
+        if self.block_out[node_id]:
+            await asyncio.sleep(60)
+            return None
         try:
             reader, writer = await asyncio.open_connection(*config.NODES[node_id])
 
             writer.write(pickle.dumps(message))
-            await writer.drain()
             await self.time_print(f"#{node_id} <- {message}")
+            await asyncio.sleep(self.node_latency[node_id] * random.triangular(0.95, 1.2, 1))
+            await writer.drain()
 
             response = await reader.read(1048576)
 
@@ -55,22 +70,36 @@ class Transporter:
             writer.close()
             return response
         except OSError:
-            return None
+            await self.time_print(f" OSError with {node_id}")
 
     async def receive_request(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         message = await reader.read(1048576)
         try:
             message = pickle.loads(message)
-        except:
+        except PickleError:
             await self.print(f"Bad request: {message}")
             return
-        await self.time_print(f"?? -> {message}")
+
+        sender_id: int
+        if isinstance(message, messages.RequestVoteRequest):
+            sender_id = message.candidate_id
+        elif isinstance(message, messages.AppendEntriesRequest):
+            sender_id = message.leader_id
+        else:
+            await self.print(f"Bad request: {message}")
+            return
+
+        if self.block_in[sender_id]:
+            return
+
+        await self.time_print(f"IN #{sender_id} -> {message}")
 
         response = await self.handler(message)
 
         writer.write(pickle.dumps(response))
+        await self.time_print(f"IN #{sender_id} <- {response}")
+        await asyncio.sleep(self.node_latency[sender_id] * random.triangular(0.95, 1.2, 1))
         await writer.drain()
-        await self.time_print(f"?? <- {response}")
         writer.close()
 
     async def run(self):

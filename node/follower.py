@@ -13,8 +13,11 @@ if TYPE_CHECKING:
 
 
 async def reset_election_timeout(self: Node):
-    self.election_timeout.reschedule(
-        asyncio.get_running_loop().time() + config.ELECTION_TIMEOUT * random.uniform(0.5, 0.8))
+    try:
+        self.election_timeout.reschedule(asyncio.get_running_loop().time() + random.uniform(config.MIN_ELECTION_TIMEOUT,
+                                                                                            config.MAX_ELECTION_TIMEOUT))
+    except RuntimeError:
+        pass
 
 
 async def follower_task(self: Node):
@@ -28,10 +31,11 @@ async def follower_task(self: Node):
 
         await self.new_epoch()
         try:
-            async with asyncio.timeout(config.ELECTION_TIMEOUT * random.uniform(0.5, 0.8)) as timeout:
+            async with asyncio.timeout(
+                    random.uniform(config.MIN_ELECTION_TIMEOUT, config.MAX_ELECTION_TIMEOUT)) as timeout:
                 self.election_timeout = timeout
                 while True:
-                    await asyncio.sleep(config.ELECTION_TIMEOUT)
+                    await asyncio.sleep(config.MAX_ELECTION_TIMEOUT)
         except TimeoutError:
             match self.current_state:
                 case NodeState.FOLLOWER:
