@@ -44,10 +44,12 @@ async def gather_votes(self: Node) -> bool:
         async with TaskGroup() as group:
             for i in filter(lambda x: x != self.node_id, config.NODES):
                 group.create_task(gather_one_vote(self, i, responses, votes_needed, votes_received))
-            timeout = random.uniform(config.MIN_ELECTION_TIMEOUT, config.MAX_ELECTION_TIMEOUT)
             try:
-                self.candidate_stop.clear()
-                await asyncio.wait_for(self.candidate_stop.wait(), timeout)
+                async with asyncio.timeout(random.uniform(config.MIN_ELECTION_TIMEOUT, config.MAX_ELECTION_TIMEOUT)):
+                    self.candidate_stop.clear()
+                    await self.candidate_stop.wait()
+                    if votes_received[0] < votes_needed:
+                        await asyncio.sleep(config.MAX_ELECTION_TIMEOUT)
             except TimeoutError:
                 pass
             group.create_task(force_terminate_task_group())
