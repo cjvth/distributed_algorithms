@@ -21,8 +21,8 @@ class Node:
         self.commit_index = 0
         self.last_applied = 0
 
-        self.next_index: list[int] = []
-        self.match_index: list[int] = []
+        self.next_index: dict[int, int] = {}
+        self.match_index: dict[int, int] = {}
 
         if self.node_id == config.INITIAL_LEADER:
             self.current_state = NodeState.LEADER

@@ -22,6 +22,7 @@ class Transporter:
         self.host = host
         self.port = port
         self.reset()
+        self.hang = False
 
     def reset(self):
         self.node_latency = {i: config.DEFAULT_DELAY for i in config.NODES}
@@ -73,6 +74,8 @@ class Transporter:
             await self.time_print(f" OSError with {node_id}")
 
     async def receive_request(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        if self.hang:
+            return
         message = await reader.read(1048576)
         try:
             message = pickle.loads(message)
@@ -111,3 +114,6 @@ class Transporter:
 
         async with server:
             await server.serve_forever()
+
+    async def hang_requests(self, what):
+        self.hang = what

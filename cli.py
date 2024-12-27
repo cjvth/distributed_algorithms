@@ -11,9 +11,11 @@ from node.node import Node
 from transporter import Transporter
 
 
-async def hang():
+async def hang(transporter: Transporter):
     fl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
+
+    await transporter.hang_requests(True)
     print("Server is hanging. Print anything to unhang")
     while True:
         x = 1
@@ -22,6 +24,9 @@ async def hang():
         a = input()
         break
     print("Unhanging")
+
+    await asyncio.sleep(0.001)
+    await transporter.hang_requests(False)
     fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fl)
     return
 
@@ -46,7 +51,7 @@ async def main():
             res = await reader.readline()
             writer.write(b'> ' + res)
             if res.startswith(b"h"):
-                await hang()
+                await hang(transporter)
             elif res.startswith(b"b"):
                 try:
                     s_id = int(res.split()[1])

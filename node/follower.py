@@ -72,12 +72,13 @@ async def handle_request_vote(
     # await self.print(f"Received request vote {request}")
     if request.term <= self.current_term:
         return messages.RequestVoteResponse(False, self.current_term)
-    await reset_election_timeout(self)
     if request.term > self.current_term:
+        await reset_election_timeout(self)
         self.current_term = request.term
         self.voted_for = request.candidate_id
         await self.new_epoch()
         return messages.RequestVoteResponse(True, self.current_term)
     if self.voted_for is None or self.voted_for == request.candidate_id:
+        await reset_election_timeout(self)
         return messages.RequestVoteResponse(True, self.current_term)
     return messages.RequestVoteResponse(False, self.current_term)
