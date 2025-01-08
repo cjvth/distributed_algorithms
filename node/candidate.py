@@ -62,12 +62,9 @@ async def gather_votes(self: Node) -> bool:
 
 async def candidate_task(self: Node):
     while True:
-        while True:
-            await self.current_state_lock.acquire()
-            if self.current_state != NodeState.CANDIDATE:
-                self.current_state_lock.release()
-            else:
-                break
+
+        await self.notify_candidate.wait()
+        self.notify_candidate.clear()
 
         while True:
             self.current_term += 1
@@ -76,13 +73,13 @@ async def candidate_task(self: Node):
             im_new_leader = await gather_votes(self)
             if im_new_leader:
                 self.current_state = NodeState.LEADER
-                self.current_state_lock.release()
+                self.notify_leader.set()
                 break
             else:
                 match self.current_state:
                     case NodeState.FOLLOWER:
                         await self.new_epoch()
-                        self.current_state_lock.release()
+                        self.notify_follower.set()
                         break
                     case NodeState.LEADER:
                         raise RuntimeError("candidate -> LEADER")

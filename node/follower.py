@@ -22,12 +22,8 @@ async def reset_election_timeout(self: Node):
 
 async def follower_task(self: Node):
     while True:
-        while True:
-            await self.current_state_lock.acquire()
-            if self.current_state != NodeState.FOLLOWER:
-                self.current_state_lock.release()
-            else:
-                break
+        await self.notify_follower.wait()
+        self.notify_follower.clear()
 
         await self.new_epoch()
         try:
@@ -40,12 +36,11 @@ async def follower_task(self: Node):
             match self.current_state:
                 case NodeState.FOLLOWER:
                     self.current_state = NodeState.CANDIDATE
+                    self.notify_candidate.set()
                 case NodeState.LEADER:
                     raise RuntimeError("follower -> LEADER")
                 case NodeState.CANDIDATE:
                     raise RuntimeError("follower -> CANDIDATE")
-
-            self.current_state_lock.release()
 
 
 async def handle_append_entries(

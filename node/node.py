@@ -24,19 +24,25 @@ class Node:
         self.next_index: dict[int, int] = {}
         self.match_index: dict[int, int] = {}
 
+        self.notify_follower = asyncio.Event()
+        self.notify_candidate = asyncio.Event()
+        self.notify_leader = asyncio.Event()
+
+        self.candidate_stop = asyncio.Event()
+
         if self.node_id == config.INITIAL_LEADER:
             self.current_state = NodeState.LEADER
+            self.notify_leader.set()
         else:
             self.current_state = NodeState.FOLLOWER
+            self.notify_follower.set()
 
         self.stdout = stdout
 
-        self.current_state_lock = asyncio.Lock()
+
 
         self.election_timeout: Timeout | None = None
         self.heartbeat_timeout: Timeout | None = None
-
-        self.candidate_stop = asyncio.Event()
 
     async def print(self, string: str | None = None):
         if string is not None:

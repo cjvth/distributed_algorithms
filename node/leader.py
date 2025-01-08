@@ -50,12 +50,9 @@ async def update_one_follower(self: Node, node: int, responses: dict[int, messag
 
 async def leader_task(self: Node):
     while True:
-        while True:
-            await self.current_state_lock.acquire()
-            if self.current_state != NodeState.LEADER:
-                self.current_state_lock.release()
-            else:
-                break
+
+        await self.notify_leader.wait()
+        self.notify_leader.clear()
 
         await init_after_election(self)
         await self.new_epoch()
@@ -76,7 +73,7 @@ async def leader_task(self: Node):
 
             match self.current_state:
                 case NodeState.FOLLOWER:
-                    self.current_state_lock.release()
+                    self.notify_follower.set()
                     break
                 case NodeState.LEADER:
                     pass
