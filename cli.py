@@ -21,7 +21,7 @@ async def hang(transporter: Transporter):
         x = 1
         for i in range(1000000):
             x += i
-        a = input()
+        input()
         break
     print("Unhanging")
 
@@ -69,4 +69,8 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Terminated")
+        exit(0)
