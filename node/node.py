@@ -1,5 +1,6 @@
 import asyncio
 from asyncio import Timeout, StreamWriter
+from collections import deque
 
 import config
 import messages
@@ -39,7 +40,7 @@ class Node:
 
         self.stdout = stdout
 
-
+        self.append_requests = deque[asyncio.Event]
 
         self.election_timeout: Timeout | None = None
         self.heartbeat_timeout: Timeout | None = None

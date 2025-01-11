@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import pickle
 import random
+import re
 from asyncio import StreamWriter
 from pickle import PickleError
 from typing import Callable, Awaitable
@@ -39,6 +40,8 @@ class Transporter:
 
     def register_handler(self, handler: Callable[[MessageRequest], Awaitable[MessageResponse]]):
         self.handler = handler
+
+    # def make_http_response(self, ):
 
     # noinspection PyMethodMayBeStatic
     async def send_request(self, node_id: int, message: MessageRequest) -> MessageResponse | None:
@@ -80,7 +83,12 @@ class Transporter:
         try:
             message = pickle.loads(message)
         except PickleError:
-            await self.print(f"Bad request: {message}")
+            try:
+                message = message.decode()
+            except UnicodeError:
+                await self.print(f"Bad request: {message}")
+            else:
+                await self.receive_http_request(message, writer)
             return
 
         sender_id: int
@@ -102,6 +110,26 @@ class Transporter:
         writer.write(pickle.dumps(response))
         await self.time_print(f"IN #{sender_id} <- {response}")
         await asyncio.sleep(self.node_latency[sender_id] * random.triangular(0.95, 1.2, 1))
+        await writer.drain()
+        writer.close()
+
+    async def receive_http_request(self, message: str, writer: asyncio.StreamWriter):
+        print(message)
+        print("!END\n")
+        m = re.match(r"^(GET|POST|PUT|DELETE|PATCH|TRACE|CONNECT) (\S+) HTTP/", message)
+        if not m:
+            writer.write(b"Not HTTP request")
+        elif m.group(1) == "GET" and m.group(2) == "/get":
+            writer.write(b"Get dictionary")
+        elif m.group(2) == "POST" and m.group(2) == "/update":
+            m2 = re.match(r"[\n\r]([^\n\r]+)$", message)
+            if not m2:
+                writer.write(b"Bad body")
+            else:
+                writer.write(b"Update: " + m2.group(1))
+        else:
+            writer.write(b"HTTP1")
+
         await writer.drain()
         writer.close()
 
