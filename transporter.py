@@ -1,8 +1,11 @@
 import asyncio
 import datetime
+import json
 import pickle
 import random
+import re
 from asyncio import StreamWriter
+from json import JSONDecodeError
 from pickle import PickleError
 from typing import Callable, Awaitable
 
@@ -39,6 +42,21 @@ class Transporter:
 
     def register_handler(self, handler: Callable[[MessageRequest], Awaitable[MessageResponse]]):
         self.handler = handler
+
+    @staticmethod
+    def make_http_response(after_http_slash: str, body: str | dict) -> bytes:
+        result = "HTTP/" + after_http_slash + "\r\n"
+        content_type: str
+        if isinstance(body, dict):
+            body_b = "some json".encode()
+            content_type = "application/json"
+        else:
+            body_b = str(body).encode()
+            content_type = "text/plain"
+        result += f"Content-Length: {len(body_b)}\r\n"
+        result += f"Content-Type: {content_type}\r\n"
+        result += "\r\n"
+        return result.encode() + body_b
 
     # noinspection PyMethodMayBeStatic
     async def send_request(self, node_id: int, message: MessageRequest) -> MessageResponse | None:
@@ -80,7 +98,12 @@ class Transporter:
         try:
             message = pickle.loads(message)
         except PickleError:
-            await self.print(f"Bad request: {message}")
+            try:
+                message = message.decode()
+            except UnicodeError:
+                await self.print(f"Bad request: {message}")
+            else:
+                await self.receive_http_request(message, writer)
             return
 
         sender_id: int
@@ -104,6 +127,43 @@ class Transporter:
         await asyncio.sleep(self.node_latency[sender_id] * random.triangular(0.95, 1.2, 1))
         await writer.drain()
         writer.close()
+
+    async def receive_http_request(self, message: str, writer: asyncio.StreamWriter):
+        print(message)
+        m = re.match(r"^(GET|POST|PUT|DELETE|PATCH|TRACE|CONNECT) (\S+) HTTP/([\d.]+)", message)
+        if not m:
+            writer.write(b"Not HTTP request")
+        elif m.group(2) == "/get":
+            if m.group(1) == "GET":
+                writer.write(self.make_http_response(f"{m.group(3)} 200 OK", f"Get dictionary"))
+            else:
+                writer.write(self.make_http_response(f"{m.group(3)} 405 Method Not Allowed", f"do GET /get"))
+        elif m.group(2) == "/update":
+            if m.group(1) == "POST":
+                m2 = re.findall(r"[\n\r]([^\n\r]+)$", message)
+                if not m2:
+                    writer.write(self.make_http_response(f"{m.group(3)} 400 Bad Request", "Bad body"))
+                else:
+                    data = m2[-1]
+                    try:
+                        d = json.loads(data)
+                    except JSONDecodeError:
+                        writer.write(self.make_http_response(f"{m.group(3)} 400 Bad Request", "Bad JSON"))
+                    else:
+                        if not isinstance(d, dict):
+                            writer.write(
+                                self.make_http_response(f"{m.group(3)} 400 Bad Request", "JSON should be a dictionary"))
+                        else:
+                            writer.write(self.make_http_response(f"{m.group(3)} 200 OK", f"Update: `{data}`  "))
+            else:
+                writer.write(self.make_http_response(f"{m.group(3)} 405 Method Not Allowed", f"do POST /update"))
+        else:
+            # writer.write(b"HTTP/1.1 200 OK\r\n")
+            writer.write(self.make_http_response(f"{m.group(3)} 404 Not Found", f"Unknown method"))
+
+        await writer.drain()
+        writer.close()
+        print("CLOSED WRITER")
 
     async def run(self):
         server = await asyncio.start_server(self.receive_request, self.host, self.port)

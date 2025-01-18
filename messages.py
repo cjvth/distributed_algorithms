@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
 from util import LogEntry
 
 
@@ -39,3 +41,11 @@ class RequestVoteRequest(MessageRequest):
 class RequestVoteResponse(MessageResponse):
     vote_granted: bool
     term: int
+
+
+
+
+# class GetDictionaryRequest(BaseModel):
+#     pass
+#
+# class ChangeDictionaryResponse(BaseModel):

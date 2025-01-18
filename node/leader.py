@@ -23,6 +23,15 @@ async def cause_heartbeat_timeout(self: Node):
     except RuntimeError:
         pass
 
+
+async def cancel_append_requests(self: Node):
+    while self.append_requests:
+        i: asyncio.Event
+        for i in self.append_requests:
+            i.set()
+        await asyncio.sleep(0.001)
+
+
 async def update_one_follower(self: Node, node: int, responses: dict[int, messages.AppendEntriesResponse | None]):
     # prevLogIndex = self.next_index[node]
     response = await self.transporter.send_request(

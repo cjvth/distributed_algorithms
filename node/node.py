@@ -1,5 +1,6 @@
 import asyncio
 from asyncio import Timeout, StreamWriter
+from collections import deque
 
 import config
 import messages
@@ -39,7 +40,7 @@ class Node:
 
         self.stdout = stdout
 
-
+        self.append_requests = deque[asyncio.Event]
 
         self.election_timeout: Timeout | None = None
         self.heartbeat_timeout: Timeout | None = None
@@ -55,7 +56,7 @@ class Node:
         await self.print(f"Term: {self.current_term}; State: {self.current_state}")
 
     async def run(self):
-        await self.print(f"Node running on {self.transporter.host}, {self.transporter.port}")
+        await self.print(f"Node running on {self.transporter.host}:{self.transporter.port}")
         await asyncio.gather(follower.follower_task(self), leader.leader_task(self), candidate.candidate_task(self))
 
     async def handle_request(self, request: MessageRequest) -> MessageResponse:
