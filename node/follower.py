@@ -5,6 +5,7 @@ import random
 
 import config
 import messages
+from node.common import common_handle_append_entries
 from util import NodeState
 from typing import TYPE_CHECKING
 
@@ -54,11 +55,12 @@ async def handle_append_entries(
         self.current_term = request.term
         self.voted_for = None
         await self.new_epoch()
-    success = len(self.log) >= request.prev_log_index + 1 and self.log[
-        request.prev_log_index].term == request.prev_log_term
+    # success = len(self.log) >= request.prev_log_index + 1 and self.log[
+    #     request.prev_log_index].term == request.prev_log_term
     # if request.leader_commit > self.commit_index:
     #     self.commit_index = min()
-    return messages.AppendEntriesResponse(success, self.current_term)
+    await self.print(f"Current log: {self.log}\n")
+    return common_handle_append_entries(self, request)
 
 
 async def handle_request_vote(

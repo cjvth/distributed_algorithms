@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 async def init_after_election(self: Node):
-    self.next_index = {i: len(self.log) + 1 for i in config.NODES}
+    self.next_index = {i: len(self.log) for i in config.NODES}
     self.match_index = {i: 0 for i in config.NODES}
 
 
@@ -33,15 +33,16 @@ async def cancel_append_requests(self: Node):
 
 
 async def update_one_follower(self: Node, node: int, responses: dict[int, messages.AppendEntriesResponse | None]):
-    # prevLogIndex = self.next_index[node]
+    prev_log_index = self.next_index[node] - 1
+    log_len = len(self.log)
     response = await self.transporter.send_request(
         node,
         messages.AppendEntriesRequest(
             self.current_term,
             self.node_id,
-            len(self.log) - 1,
-            self.log[-1].term,
-            [],
+            prev_log_index,
+            self.log[prev_log_index].term,
+            self.log[prev_log_index + 1:],
             self.commit_index
         )
     )
@@ -55,6 +56,11 @@ async def update_one_follower(self: Node, node: int, responses: dict[int, messag
         self.current_state = NodeState.FOLLOWER
         await cause_heartbeat_timeout(self)
         return
+    if response.success:
+        self.next_index[node] = log_len
+        self.match_index[node] = log_len - 1
+    else:
+        self.next_index[node] = max(1, self.next_index[node] - 1)
 
 
 async def leader_task(self: Node):
@@ -88,6 +94,8 @@ async def leader_task(self: Node):
                     pass
                 case NodeState.CANDIDATE:
                     raise RuntimeError("leader -> candidate")
+
+            await self.print(f"Current log: {self.log}\n")
             await self.print()
 
 
