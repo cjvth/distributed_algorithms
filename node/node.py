@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import asyncio
+import json
+import typing
 from asyncio import Timeout, StreamWriter
 from collections import deque
 
@@ -6,8 +10,10 @@ import config
 import messages
 from messages import MessageRequest, MessageResponse
 from node import follower, leader, candidate
-from transporter import Transporter
 from util import LogEntry, NodeState
+
+if typing.TYPE_CHECKING:
+    from transporter import Transporter
 
 
 class Node:
@@ -20,7 +26,7 @@ class Node:
         self.voted_for: int | None = None
         self.log: list[LogEntry] = [LogEntry.initial()]
         self.commit_index = 0
-        self.last_applied = 0
+        # self.last_applied = 0
 
         self.next_index: dict[int, int] = {}
         self.match_index: dict[int, int] = {}
@@ -59,6 +65,9 @@ class Node:
         await self.print(f"Node running on {self.transporter.host}:{self.transporter.port}")
         await asyncio.gather(follower.follower_task(self), leader.leader_task(self), candidate.candidate_task(self))
 
+    async def handle_get_dictionary(self) -> dict:
+        return self.log[self.commit_index].dictionary
+
     async def handle_request(self, request: MessageRequest) -> MessageResponse:
         if isinstance(request, messages.AppendEntriesRequest):
             match self.current_state:
@@ -77,5 +86,15 @@ class Node:
                     return await leader.handle_request_vote(self, request)
                 case NodeState.CANDIDATE:
                     return await candidate.handle_request_vote(self, request)
+
+        elif isinstance(request, messages.UpdateDictionaryRequest):
+            if self.current_state == NodeState.LEADER:
+                return await leader.handle_update_dictionary(self, request)
+            else:
+                return messages.UpdateDictionaryResponse("400 Bad Request", "Not a leader")
+
+        elif isinstance(request, messages.GetDictionaryRequest):
+            return messages.GetDictionaryResponse("200 OK", self.log[self.commit_index].dictionary)
         else:
             await self.print(f"Bad request {type(request)} {request}")
+

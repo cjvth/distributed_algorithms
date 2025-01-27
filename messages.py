@@ -43,9 +43,23 @@ class RequestVoteResponse(MessageResponse):
     term: int
 
 
+@dataclass
+class UpdateDictionaryRequest(MessageRequest):
+    message: dict | str
 
 
-# class GetDictionaryRequest(BaseModel):
-#     pass
-#
-# class ChangeDictionaryResponse(BaseModel):
+@dataclass
+class UpdateDictionaryResponse(MessageResponse):
+    status: str
+    message: str | None
+
+
+@dataclass
+class GetDictionaryRequest(MessageRequest):
+    pass
+
+
+@dataclass
+class GetDictionaryResponse(MessageResponse):
+    status: str
+    dictionary: dict

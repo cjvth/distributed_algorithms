@@ -6,6 +6,10 @@ NODES = {
     5: ("localhost", "5005"),
 }
 
+TOTAL_NODES = len(NODES)
+
+MAJORITY_NODES = TOTAL_NODES // 2 + 1
+
 INITIAL_LEADER = -1
 
 BASE_TIME = .5  # sec

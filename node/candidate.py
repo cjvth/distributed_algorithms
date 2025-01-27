@@ -37,7 +37,7 @@ async def gather_one_vote(self: Node, node: int, responses: list[messages.Reques
 
 
 async def gather_votes(self: Node) -> bool:
-    votes_needed = len(config.NODES) // 2 + 1
+    votes_needed = config.MAJORITY_NODES
     votes_received = [1]
     responses: list[messages.RequestVoteResponse | None] = []
     try:

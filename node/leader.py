@@ -5,7 +5,7 @@ from asyncio import TaskGroup
 
 import config
 import messages
-from util import NodeState, force_terminate_task_group, TerminateTaskGroup
+from util import NodeState, force_terminate_task_group, TerminateTaskGroup, LogEntry
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -119,3 +119,11 @@ async def handle_request_vote(
         await cause_heartbeat_timeout(self)
         return messages.RequestVoteResponse(True, self.current_term)
     return messages.RequestVoteResponse(False, self.current_term)
+
+
+async def handle_update_dictionary(
+        self: Node,
+        request: messages.UpdateDictionaryRequest
+):
+    self.log.append(LogEntry(self.current_term, self.log[-1].dictionary | request.message))
+    return messages.UpdateDictionaryResponse("201 Created", None)

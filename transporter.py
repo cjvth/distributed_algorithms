@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import datetime
 import json
 import pickle
 import random
 import re
+import typing
 from asyncio import StreamWriter
 from json import JSONDecodeError
 from pickle import PickleError
@@ -13,9 +16,13 @@ import config
 import messages
 from messages import MessageRequest, MessageResponse
 
+if typing.TYPE_CHECKING:
+    from node.node import Node
+
 
 class Transporter:
     handler: Callable[[MessageRequest], Awaitable[MessageResponse]] | None = None
+    node: Node | None = None
     node_latency: dict[int, float]
     block_in: dict[int, bool]
     block_out: dict[int, bool]
@@ -44,19 +51,22 @@ class Transporter:
         self.handler = handler
 
     @staticmethod
-    def make_http_response(after_http_slash: str, body: str | dict) -> bytes:
+    def make_http_response(after_http_slash: str, body: str | dict | None) -> bytes:
         result = "HTTP/" + after_http_slash + "\r\n"
         content_type: str
+        if body is None:
+            return result.encode()
         if isinstance(body, dict):
-            body_b = "some json".encode()
+            body_b = json.dumps(body)
             content_type = "application/json"
         else:
-            body_b = str(body).encode()
+            body_b = str(body)
             content_type = "text/plain"
         result += f"Content-Length: {len(body_b)}\r\n"
         result += f"Content-Type: {content_type}\r\n"
         result += "\r\n"
-        return result.encode() + body_b
+        result += body_b
+        return result.encode()
 
     # noinspection PyMethodMayBeStatic
     async def send_request(self, node_id: int, message: MessageRequest) -> MessageResponse | None:
@@ -135,7 +145,10 @@ class Transporter:
             writer.write(b"Not HTTP request")
         elif m.group(2) == "/get":
             if m.group(1) == "GET":
-                writer.write(self.make_http_response(f"{m.group(3)} 200 OK", f"Get dictionary"))
+                response = await self.handler(messages.GetDictionaryRequest())
+                if not isinstance(response, messages.GetDictionaryResponse):
+                    raise RuntimeError("Expected GetDictionaryResponse, got " + str(type(response)))
+                writer.write(self.make_http_response(f"{m.group(3)} {response.status}", response.dictionary))
             else:
                 writer.write(self.make_http_response(f"{m.group(3)} 405 Method Not Allowed", f"do GET /get"))
         elif m.group(2) == "/update":
@@ -154,11 +167,13 @@ class Transporter:
                             writer.write(
                                 self.make_http_response(f"{m.group(3)} 400 Bad Request", "JSON should be a dictionary"))
                         else:
-                            writer.write(self.make_http_response(f"{m.group(3)} 200 OK", f"Update: `{data}`  "))
+                            response = await self.handler(messages.UpdateDictionaryRequest(d))
+                            if not isinstance(response, messages.UpdateDictionaryResponse):
+                                raise RuntimeError("Expected UpdateDictionaryResponse, got " + str(type(response)))
+                            writer.write(self.make_http_response(f"{m.group(3)} {response.status}", response.message))
             else:
                 writer.write(self.make_http_response(f"{m.group(3)} 405 Method Not Allowed", f"do POST /update"))
         else:
-            # writer.write(b"HTTP/1.1 200 OK\r\n")
             writer.write(self.make_http_response(f"{m.group(3)} 404 Not Found", f"Unknown method"))
 
         await writer.drain()
