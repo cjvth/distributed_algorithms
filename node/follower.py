@@ -5,7 +5,7 @@ import random
 
 import config
 import messages
-from node.common import common_handle_append_entries, print_log
+from node.common import common_handle_append_entries, print_log, should_vote
 from util import NodeState
 from typing import TYPE_CHECKING
 
@@ -70,13 +70,13 @@ async def handle_request_vote(
     # await self.print(f"Received request vote {request}")
     if request.term <= self.current_term:
         return messages.RequestVoteResponse(False, self.current_term)
-    if request.term > self.current_term:
+    if request.term > self.current_term and await should_vote(self, request):
         await reset_election_timeout(self)
         self.current_term = request.term
         self.voted_for = request.candidate_id
         await self.new_epoch()
         return messages.RequestVoteResponse(True, self.current_term)
-    if self.voted_for is None or self.voted_for == request.candidate_id:
+    if self.voted_for is None or self.voted_for == request.candidate_id and await should_vote(self, request):
         await reset_election_timeout(self)
         return messages.RequestVoteResponse(True, self.current_term)
     return messages.RequestVoteResponse(False, self.current_term)

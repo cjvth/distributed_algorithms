@@ -6,7 +6,7 @@ from asyncio import TaskGroup
 
 import config
 import messages
-from node.common import common_handle_append_entries, print_log
+from node.common import common_handle_append_entries, print_log, should_vote
 from util import force_terminate_task_group, TerminateTaskGroup, NodeState
 from typing import TYPE_CHECKING
 
@@ -107,9 +107,9 @@ async def handle_request_vote(
     # await self.print(f"Received request vote {request}")
     if request.term > self.current_term:
         self.current_term = request.term
-        self.voted_for = request.candidate_id
-        self.current_state = NodeState.FOLLOWER
         self.candidate_stop.set()
-        return messages.RequestVoteResponse(True, self.current_term)
-    else:
-        return messages.RequestVoteResponse(False, self.current_term)
+        if await should_vote(self, request):
+            self.voted_for = request.candidate_id
+            self.current_state = NodeState.FOLLOWER
+            return messages.RequestVoteResponse(True, self.current_term)
+    return messages.RequestVoteResponse(False, self.current_term)

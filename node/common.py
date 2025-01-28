@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import messages
+from util import NodeState
 
 if TYPE_CHECKING:
     from node.node import Node
@@ -27,4 +28,21 @@ def common_handle_append_entries(self: Node, request: messages.AppendEntriesRequ
 async def print_log(self: Node):
     await self.print(f"Committed:\n{str(self.log[:self.commit_index + 1])}")
     if self.commit_index + 1 < len(self.log):
-        await self.print(f"\nNot committed:\n{str(self.log[self.commit_index + 1:])}")
+        await self.print(f"Not committed:\n{str(self.log[self.commit_index + 1:])}")
+    await self.print("\n")
+
+
+async def should_vote(self: Node, request: messages.RequestVoteRequest):
+    if self.log[-1].term < request.last_log_term:
+        await self.print(f"Better last term: {request.last_log_term}; My: {self.log}")
+        return True
+    if self.log[-1].term > request.last_log_term:
+        return False
+    if len(self.log) - 1 < request.last_log_index:
+        await self.print(f"Better last index: {request.last_log_index}; My: {self.log}")
+        return True
+    if len(self.log) - 1 > request.last_log_index:
+        return False
+    await self.print(f"OK: term {request.last_log_term} index {request.last_log_index}; My: {self.log}")
+    # return self.current_state != NodeState.CANDIDATE
+    return True
