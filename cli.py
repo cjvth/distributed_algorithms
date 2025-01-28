@@ -57,7 +57,7 @@ async def main():
                     s_id = int(res.split()[1])
                     transporter.block_in[s_id] = True
                     transporter.block_out[s_id] = True
-                    writer.write(b'Blocked server for in and out connections')
+                    writer.write(f'Blocked server {s_id} for in and out connections'.encode())
                     await writer.drain()
                 except (IndexError, ValueError):
                     writer.write(b'Should be "block id" with valid id')

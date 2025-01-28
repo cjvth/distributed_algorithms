@@ -5,6 +5,7 @@ from asyncio import TaskGroup
 
 import config
 import messages
+from node.common import print_log
 from util import NodeState, force_terminate_task_group, TerminateTaskGroup, LogEntry
 from typing import TYPE_CHECKING
 
@@ -95,7 +96,17 @@ async def leader_task(self: Node):
                 case NodeState.CANDIDATE:
                     raise RuntimeError("leader -> candidate")
 
-            await self.print(f"Current log: {self.log}\n")
+            for i in range(self.commit_index, len(self.log)):
+                n = 1
+                for m in self.match_index.values():
+                    if m >= i:
+                        n += 1
+                if n >= config.MAJORITY_NODES:
+                    # print("!!! MATCH", i, self.match_index)
+                    self.commit_index = i
+                else:
+                    break
+            await print_log(self)
             await self.print()
 
 

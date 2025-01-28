@@ -128,12 +128,12 @@ class Transporter:
         if self.block_in[sender_id]:
             return
 
-        await self.time_print(f"IN #{sender_id} -> {message}")
+        await self.time_print(f"IN  #{sender_id} -> {message}")
 
         response = await self.handler(message)
 
         writer.write(pickle.dumps(response))
-        await self.time_print(f"IN #{sender_id} <- {response}")
+        await self.time_print(f"OUT #{sender_id} <- {response}")
         await asyncio.sleep(self.node_latency[sender_id] * random.triangular(0.95, 1.2, 1))
         await writer.drain()
         writer.close()

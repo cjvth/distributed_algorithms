@@ -5,7 +5,7 @@ import random
 
 import config
 import messages
-from node.common import common_handle_append_entries
+from node.common import common_handle_append_entries, print_log
 from util import NodeState
 from typing import TYPE_CHECKING
 
@@ -19,6 +19,8 @@ async def reset_election_timeout(self: Node):
                                                                                             config.MAX_ELECTION_TIMEOUT))
     except RuntimeError:
         pass
+    await print_log(self)
+    await self.print()
 
 
 async def follower_task(self: Node):
@@ -59,7 +61,6 @@ async def handle_append_entries(
     #     request.prev_log_index].term == request.prev_log_term
     # if request.leader_commit > self.commit_index:
     #     self.commit_index = min()
-    await self.print(f"Current log: {self.log}\n")
     return common_handle_append_entries(self, request)
 
 

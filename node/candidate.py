@@ -6,7 +6,7 @@ from asyncio import TaskGroup
 
 import config
 import messages
-from node.common import common_handle_append_entries
+from node.common import common_handle_append_entries, print_log
 from util import force_terminate_task_group, TerminateTaskGroup, NodeState
 from typing import TYPE_CHECKING
 
@@ -71,6 +71,7 @@ async def candidate_task(self: Node):
             self.current_term += 1
             self.voted_for = self.node_id
             await self.new_epoch()
+            await print_log(self)
             im_new_leader = await gather_votes(self)
             if im_new_leader:
                 self.current_state = NodeState.LEADER
@@ -97,7 +98,7 @@ async def handle_append_entries(
     self.current_term = request.term
     self.current_state = NodeState.FOLLOWER
     self.candidate_stop.set()
-    return messages.AppendEntriesResponse(True, self.current_term)
+    return common_handle_append_entries(self, request)
 
 
 async def handle_request_vote(
@@ -109,6 +110,6 @@ async def handle_request_vote(
         self.voted_for = request.candidate_id
         self.current_state = NodeState.FOLLOWER
         self.candidate_stop.set()
-        return common_handle_append_entries(self, request)
+        return messages.RequestVoteResponse(True, self.current_term)
     else:
         return messages.RequestVoteResponse(False, self.current_term)

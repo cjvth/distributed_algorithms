@@ -9,9 +9,7 @@ if TYPE_CHECKING:
 
 
 def handle_get_dictionary(self: Node, request: messages.GetDictionaryRequest) -> messages.GetDictionaryResponse:
-    # TODO
-    # return messages.GetDictionaryResponse("200 OK", self.log[self.commit_index].dictionary)
-    return messages.GetDictionaryResponse("200 OK", self.log[-1].dictionary)
+    return messages.GetDictionaryResponse("200 OK", self.log[self.commit_index].dictionary)
 
 
 def common_handle_append_entries(self: Node, request: messages.AppendEntriesRequest):
@@ -24,3 +22,9 @@ def common_handle_append_entries(self: Node, request: messages.AppendEntriesRequ
     if request.leader_commit > self.commit_index:
         self.commit_index = min(request.leader_commit, len(self.log) - 1)
     return messages.AppendEntriesResponse(True, self.current_term)
+
+
+async def print_log(self: Node):
+    await self.print(f"Committed:\n{str(self.log[:self.commit_index + 1])}")
+    if self.commit_index + 1 < len(self.log):
+        await self.print(f"\nNot committed:\n{str(self.log[self.commit_index + 1:])}")
